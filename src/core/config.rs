@@ -1,6 +1,7 @@
 use eframe::egui::Color32;
 
 // --- CONFIGURATION FENÊTRE ---
+pub const WINDOW_TITLE: &str = "Sum Sum";           // Le petit nom de ton compagnon
 pub const WINDOW_WIDTH: f32 = 300.0;              // Largeur de la fenêtre (pixels)
 pub const WINDOW_HEIGHT: f32 = 200.0;             // Hauteur de la fenêtre (pixels)
 pub const BG_COLOR: Color32 = Color32::from_rgb(10, 10, 10); // Couleur du fond (Noir gris)
@@ -39,3 +40,4 @@ pub const LASER_COLOR: Color32 = Color32::from_rgb(0, 255, 0); // Couleur du tra
 pub const TEXT_SYSTEM_COLOR: Color32 = Color32::from_rgb(180, 180, 180); // Couleur réponse IA (Gris)
 pub const TEXT_USER_COLOR: Color32 = Color32::from_rgb(0, 255, 0);     // Couleur ton texte (Rouge)
 pub const BORDER_COLOR: Color32 = Color32::from_rgb(30, 30, 30);         // Couleur cadre de saisie
+pub const EYE_COLOR: Color32 = Color32::from_rgb(255, 255, 255); // JAUNE SOLEIL (Sum Sum !)

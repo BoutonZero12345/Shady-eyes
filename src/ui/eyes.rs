@@ -34,11 +34,9 @@ pub fn draw_eyes(ctx: &Context, center_x: f32, center_y: f32, current_offset: Ve
         Pos2::new(center_x - EYE_SPACING / 2.0, center_y),
         Pos2::new(center_x + EYE_SPACING / 2.0, center_y),
     ];
-
-    for origin in origins {
+for origin in origins {
         let pupil_center = origin + smoothed_offset;
         
-        // On passe le y_scale à la fonction de dessin
         draw_pixelated_circle(
             ctx, 
             pupil_center, 
@@ -52,7 +50,7 @@ pub fn draw_eyes(ctx: &Context, center_x: f32, center_y: f32, current_offset: Ve
             ctx, 
             pupil_center, 
             PUPIL_RADIUS_PIXELS, 
-            Color32::WHITE,
+            EYE_COLOR, // ON UTILISE LA COULEUR DE LA CONFIG ICI
             PUPIL_PIXEL_OVERLAP,
             y_scale
         );
@@ -60,6 +58,7 @@ pub fn draw_eyes(ctx: &Context, center_x: f32, center_y: f32, current_offset: Ve
 
     smoothed_offset
 }
+
 
 fn draw_pixelated_circle(ctx: &Context, center: Pos2, radius: isize, color: Color32, overlap: f32, y_scale: f32) {
     let r_f32 = radius as f32;

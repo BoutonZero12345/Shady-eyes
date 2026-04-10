@@ -3,7 +3,7 @@ pub mod core;
 pub mod ui;
 
 use eframe::egui;
-use crate::core::config::{WINDOW_HEIGHT, WINDOW_WIDTH};
+use crate::core::config::{WINDOW_HEIGHT, WINDOW_WIDTH, WINDOW_TITLE};
 
 fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
@@ -13,7 +13,7 @@ fn main() -> eframe::Result<()> {
     };
 
     eframe::run_native(
-        "Shady_LLM",
+        WINDOW_TITLE,
         options,
         Box::new(|cc| Box::new(app::ShadyApp::new(cc))),
     )

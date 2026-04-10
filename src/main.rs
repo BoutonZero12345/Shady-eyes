@@ -1,12 +1,14 @@
 mod app;
+pub mod core;
+pub mod ui;
 
 use eframe::egui;
+use crate::core::config::{WINDOW_HEIGHT, WINDOW_WIDTH};
 
 fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([600.0, 500.0])
-            .with_clear_color(egui::Color32::from_rgb(10, 10, 10)),
+            .with_inner_size([WINDOW_WIDTH, WINDOW_HEIGHT]),
         ..Default::default()
     };
 

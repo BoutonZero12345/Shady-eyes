@@ -1,0 +1,14 @@
+C:\Users\maman\Documents\Mes créations\Shady eyes\Shady-eyes\target\release\deps\serde-2e9f3947a488f034.d: C:\Users\maman\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\lib.rs C:\Users\maman\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\integer128.rs C:\Users\maman\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\mod.rs C:\Users\maman\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\de.rs C:\Users\maman\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\ser.rs C:\Users\maman\Documents\Mes\ créations\Shady\ eyes\Shady-eyes\target\release\build\serde-bb6ef84344c76dd9\out/private.rs
+
+C:\Users\maman\Documents\Mes créations\Shady eyes\Shady-eyes\target\release\deps\libserde-2e9f3947a488f034.rlib: C:\Users\maman\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\lib.rs C:\Users\maman\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\integer128.rs C:\Users\maman\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\mod.rs C:\Users\maman\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\de.rs C:\Users\maman\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\ser.rs C:\Users\maman\Documents\Mes\ créations\Shady\ eyes\Shady-eyes\target\release\build\serde-bb6ef84344c76dd9\out/private.rs
+
+C:\Users\maman\Documents\Mes créations\Shady eyes\Shady-eyes\target\release\deps\libserde-2e9f3947a488f034.rmeta: C:\Users\maman\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\lib.rs C:\Users\maman\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\integer128.rs C:\Users\maman\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\mod.rs C:\Users\maman\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\de.rs C:\Users\maman\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\ser.rs C:\Users\maman\Documents\Mes\ créations\Shady\ eyes\Shady-eyes\target\release\build\serde-bb6ef84344c76dd9\out/private.rs
+
+C:\Users\maman\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\lib.rs:
+C:\Users\maman\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\integer128.rs:
+C:\Users\maman\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\mod.rs:
+C:\Users\maman\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\de.rs:
+C:\Users\maman\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\ser.rs:
+C:\Users\maman\Documents\Mes\ créations\Shady\ eyes\Shady-eyes\target\release\build\serde-bb6ef84344c76dd9\out/private.rs:
+
+# env-dep:OUT_DIR=C:\\Users\\maman\\Documents\\Mes créations\\Shady eyes\\Shady-eyes\\target\\release\\build\\serde-bb6ef84344c76dd9\\out

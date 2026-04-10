@@ -1,8 +1,7 @@
 use eframe::egui::{self, Pos2, Rect, Vec2};
 use serde::{Deserialize, Serialize};
-
-// On importe nos modules proprement découpés
-use crate::core::config::{BG_COLOR, TARGET_FPS};
+use rand::Rng; // Import pour l'aléatoire
+use crate::core::config::*;
 use crate::core::types::{Message, Role};
 use crate::ui::eyes::draw_eyes;
 use crate::ui::login::show_login_screen;
@@ -16,18 +15,28 @@ pub struct ShadyApp {
     history: Vec<Message>,
     #[serde(skip)]
     user_input: String,
+    #[serde(skip)]
+    current_eye_offset: Vec2,
+    #[serde(skip)]
+    blink_timer: f32,       // Temps écoulé depuis le dernier clignement
+    #[serde(skip)]
+    next_blink: f32,        // Quand le prochain clignement doit arriver
+    #[serde(skip)]
+    eye_y_scale: f32,       // Facteur d'écrasement vertical actuel
 }
 
 impl Default for ShadyApp {
     fn default() -> Self {
+        let mut rng = rand::thread_rng();
         Self {
             api_key: String::new(),
             is_unlocked: false,
-            history: vec![Message {
-                role: Role::System,
-                content: "HOW CAN I HELP YOU TODAY?".to_string(),
-            }],
+            history: vec![Message { role: Role::System, content: STR_WELCOME.to_string() }],
             user_input: String::new(),
+            current_eye_offset: Vec2::ZERO,
+            blink_timer: 0.0,
+            next_blink: rng.gen_range((BLINK_INTERVAL_MEAN - BLINK_INTERVAL_VAR)..(BLINK_INTERVAL_MEAN + BLINK_INTERVAL_VAR)),
+            eye_y_scale: 1.0,
         }
     }
 }
@@ -39,6 +48,26 @@ impl ShadyApp {
         }
         Self::default()
     }
+
+    fn update_blink(&mut self, dt: f32) {
+        self.blink_timer += dt;
+
+        if self.blink_timer > self.next_blink {
+            // Animation de clignement (Sinusoidal pour un aller-retour fluide)
+            let blink_progress = (self.blink_timer - self.next_blink) * BLINK_SPEED;
+            if blink_progress > std::f32::consts::PI {
+                // Fin du clignement
+                self.eye_y_scale = 1.0;
+                self.blink_timer = 0.0;
+                let mut rng = rand::thread_rng();
+                self.next_blink = rng.gen_range((BLINK_INTERVAL_MEAN - BLINK_INTERVAL_VAR)..(BLINK_INTERVAL_MEAN + BLINK_INTERVAL_VAR));
+            } else {
+                // On écrase l'œil selon la courbe du sinus
+                let wave = blink_progress.sin(); 
+                self.eye_y_scale = 1.0 - (wave * (1.0 - BLINK_MIN_Y_SCALE));
+            }
+        }
+    }
 }
 
 impl eframe::App for ShadyApp {
@@ -47,7 +76,9 @@ impl eframe::App for ShadyApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Limitation dynamique des FPS depuis notre fichier de configuration
+        let dt = 1.0 / TARGET_FPS as f32;
+        self.update_blink(dt);
+        
         ctx.request_repaint_after(std::time::Duration::from_millis(1000 / TARGET_FPS));
 
         egui::CentralPanel::default()
@@ -57,29 +88,19 @@ impl eframe::App for ShadyApp {
                 let center_x = available_rect.center().x;
                 let center_y = available_rect.center().y - 120.0;
 
-                // 1. On dessine les yeux en arrière-plan (géré par le module eyes.rs)
-                draw_eyes(ctx, center_x, center_y, &self.user_input);
+                // On envoie le eye_y_scale au dessinateur
+                self.current_eye_offset = draw_eyes(ctx, center_x, center_y, self.current_eye_offset, self.eye_y_scale);
 
-                // 2. On définit la zone allouée pour l'interface texte (en dessous des yeux)
                 let terminal_rect = Rect::from_min_size(
                     Pos2::new(40.0, center_y + 120.0),
-                    Vec2::new(
-                        available_rect.width() - 80.0,
-                        available_rect.height() - (center_y + 120.0) - 20.0,
-                    ),
+                    Vec2::new(available_rect.width() - 80.0, available_rect.height() - (center_y + 120.0) - 20.0),
                 );
 
-                // 3. On affiche le bon écran selon l'état de l'application
                 ui.allocate_ui_at_rect(terminal_rect, |ui| {
                     ui.vertical(|ui| {
-                        // On force la police Monospace pour tout ce qui est dans cette zone
-                        ui.style_mut().override_text_style = Some(egui::TextStyle::Monospace);
-
                         if !self.is_unlocked {
-                            // Écran 1 : Appel du module de connexion
                             show_login_screen(ui, &mut self.api_key, &mut self.is_unlocked);
                         } else {
-                            // Écran 2 : Appel du module de chat
                             show_terminal_screen(ui, &mut self.history, &mut self.user_input);
                         }
                     });

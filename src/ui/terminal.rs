@@ -1,17 +1,16 @@
-use eframe::egui::{self, ScrollArea, Stroke, Ui};
+use eframe::egui::{self, ScrollArea, Stroke, Ui, Id, Vec2, FontId};
 use crate::core::types::{Message, Role};
-use crate::core::config::{TEXT_SYSTEM_COLOR, TEXT_USER_COLOR, BORDER_COLOR};
+use crate::core::config::*;
 
-pub fn show_terminal_screen(
-    ui: &mut Ui,
-    history: &mut Vec<Message>,
-    user_input: &mut String,
-) {
+pub fn show_terminal_screen(ui: &mut Ui, history: &mut Vec<Message>, user_input: &mut String) {
+    ui.style_mut().override_font_id = Some(FontId::monospace(TERMINAL_FONT_SIZE));
+
     ScrollArea::vertical()
         .auto_shrink([false; 2])
-        .max_height(ui.available_height() - 90.0)
+        .max_height(ui.available_height() - 120.0)
         .stick_to_bottom(true)
         .show(ui, |ui| {
+            ui.set_min_width(ui.available_width());
             for msg in history.iter() {
                 match msg.role {
                     Role::System => {
@@ -36,29 +35,27 @@ pub fn show_terminal_screen(
         .show(ui, |ui| {
             ui.visuals_mut().override_text_color = Some(TEXT_USER_COLOR);
 
-            let response = ui.add_sized(
-                [ui.available_width(), 50.0],
-                egui::TextEdit::multiline(user_input)
-                    .frame(false)
-                    .cursor_at_end(true)
-                    .hint_text("..."),
-            );
+            let output = egui::TextEdit::multiline(user_input)
+                .desired_width(f32::INFINITY)
+                .min_size(Vec2::new(0.0, 90.0))
+                .frame(false)
+                .cursor_at_end(true)
+                .hint_text(STR_HINT)
+                .show(ui);
 
-            if response.has_focus()
-                && ui.input(|i| i.key_pressed(egui::Key::Enter) && !i.modifiers.shift)
-            {
+            let response = output.response;
+
+            if let Some(cursor_range) = output.cursor_range {
+                let cursor_rect = output.galley.pos_from_cursor(&cursor_range.primary);
+                let screen_pos = response.rect.min + cursor_rect.center().to_vec2();
+                ui.ctx().data_mut(|d| d.insert_temp(Id::new("cursor_pos"), screen_pos));
+            }
+
+            if response.has_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter) && !i.modifiers.shift) {
                 let text = user_input.trim().to_string();
                 if !text.is_empty() {
-                    history.push(Message {
-                        role: Role::User,
-                        content: text,
-                    });
-                    
-                    history.push(Message {
-                        role: Role::System,
-                        content: "PROCESSING...".to_string(),
-                    });
-                    
+                    history.push(Message { role: Role::User, content: text });
+                    history.push(Message { role: Role::System, content: STR_PROCESSING.to_string() });
                     user_input.clear();
                 }
             }

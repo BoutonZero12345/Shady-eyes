@@ -2805,6 +2805,7 @@ name = "shady_eyes"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "rand",
  "serde",
 ]
 

@@ -1,9 +1,11 @@
-use eframe::egui::{self, Ui};
-use crate::core::config::TEXT_USER_COLOR;
+use eframe::egui::{self, Ui, FontId};
+use crate::core::config::{TEXT_USER_COLOR, STR_LOCKED, TERMINAL_FONT_SIZE};
 
 pub fn show_login_screen(ui: &mut Ui, api_key: &mut String, is_unlocked: &mut bool) {
+    ui.style_mut().override_font_id = Some(FontId::monospace(TERMINAL_FONT_SIZE));
     ui.visuals_mut().override_text_color = Some(TEXT_USER_COLOR);
-    ui.label("SYSTEM LOCKED. ENTER API KEY:");
+    
+    ui.label(STR_LOCKED); // Utilise la config
     ui.add_space(15.0);
 
     let response = ui.add_sized(

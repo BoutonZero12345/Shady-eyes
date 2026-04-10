@@ -1,71 +1,41 @@
 use eframe::egui::Color32;
 
-// ==========================================
-// PARAMÈTRES DE LA FENÊTRE PRINCIPALE
-// ==========================================
+// --- CONFIGURATION FENÊTRE ---
+pub const WINDOW_WIDTH: f32 = 300.0;              // Largeur de la fenêtre (pixels)
+pub const WINDOW_HEIGHT: f32 = 200.0;             // Hauteur de la fenêtre (pixels)
+pub const BG_COLOR: Color32 = Color32::from_rgb(10, 10, 10); // Couleur du fond (Noir gris)
 
-/// Largeur de la fenêtre au démarrage (en pixels réels)
-pub const WINDOW_WIDTH: f32 = 600.0;
+// --- SYSTÈME & TEXTE ---
+pub const TARGET_FPS: u64 = 120;                   // Vitesse de rafraîchissement (24 = saccadé, 60 = fluide)
+pub const TERMINAL_FONT_SIZE: f32 = 15.0;         // Taille de la police de caractères
+pub const STR_LOCKED: &str = "SYSTEM LOCKED. ENTER API KEY:"; // Message écran de verrouillage
+pub const STR_PROCESSING: &str = "PROCESSING..."; // Message pendant que l'IA réfléchit
+pub const STR_HINT: &str = "...";                 // Texte d'aide dans la barre de saisie
+pub const STR_WELCOME: &str = "HOW CAN I HELP YOU TODAY?"; // Premier message au démarrage
 
-/// Hauteur de la fenêtre au démarrage (en pixels réels)
-pub const WINDOW_HEIGHT: f32 = 500.0;
+// --- PHYSIQUE DES YEUX ---
+pub const EYE_SPACING: f32 = 180.0;               // Écartement entre les deux yeux
+pub const MAX_EYE_MOVEMENT: f32 = 64.0;           // Rayon de déplacement max des pupilles
+pub const EYE_TRACKING_SENSITIVITY: f32 = 0.5;   // Force du suivi (0.1 bas, 0.5 très nerveux)
+pub const EYE_SMOOTHING: f32 = 0.05;              // VITESSE DE DÉPLACEMENT (0.01 lent, 1.0 instantané)
 
-/// Couleur de fond de l'application (Rouge, Vert, Bleu - de 0 à 255)
-/// Actuellement : Un gris extrêmement sombre, presque noir.
-pub const BG_COLOR: Color32 = Color32::from_rgb(10, 10, 10);
+// --- RÉGLAGES DU CLIGNEMENT (BLINK) ---
+pub const BLINK_INTERVAL_MEAN: f32 = 3.0;         // Temps moyen entre deux clignements (secondes)
+pub const BLINK_INTERVAL_VAR: f32 = 2.0;          // Variation aléatoire (+/- secondes)
+pub const BLINK_SPEED: f32 = 50.0;                // Vitesse de fermeture/ouverture (plus haut = plus rapide)
+pub const BLINK_MIN_Y_SCALE: f32 = 0.05;          // Écrasement vertical max (0.0 = fermé total)
 
+// --- RENDU PIXEL (8-BIT) ---
+pub const PIXEL_SIZE: f32 = 4.0;                  // Taille d'un bloc de l'œil (en pixels réels)
+pub const PUPIL_PIXEL_OVERLAP: f32 = 0.5;         // Surplus pour la pupille (supprime le quadrillage)
+pub const GLOW_PIXEL_OVERLAP: f32 = -2.0;          // Surplus pour l'aura (plus grand pour plus de flou)
+pub const PUPIL_RADIUS_PIXELS: isize = 9;         // Rayon de la pupille (en nombre de blocs)
+pub const AURA_RADIUS_PIXELS: isize = 13;         // Rayon de l'aura (en nombre de blocs)
 
-// ==========================================
-// PARAMÈTRES D'ANIMATION ET DE POSITION
-// ==========================================
-
-/// Vitesse de l'animation. 24 donne un style "cinéma/rétro" légèrement saccadé.
-/// 60 donnera un mouvement parfaitement fluide.
-pub const TARGET_FPS: u64 = 24;
-
-/// Distance (en pixels réels) entre le centre de l'œil gauche et l'œil droit.
-/// Augmente cette valeur pour les écarter.
-pub const EYE_SPACING: f32 = 140.0;
-
-/// Distance maximale (en pixels réels) à laquelle les yeux peuvent se déplacer 
-/// pour suivre la souris ou le texte.
-pub const MAX_EYE_MOVEMENT: f32 = 90.0;
-
-
-// ==========================================
-// PARAMÈTRES DU RENDU PIXELISÉ (STYLE 8-BIT)
-// ==========================================
-
-/// La taille d'un "bloc" à l'écran. 
-/// Si tu mets 4.0, chaque pixel de l'œil sera un carré de 4x4 vrais pixels.
-/// Augmente pour un effet Minecraft, diminue pour un effet plus lisse.
-pub const PIXEL_SIZE: f32 = 4.0;
-
-/// Le rayon de la pupille blanche, compté en "gros pixels".
-/// Exemple: 7 signifie que la pupille fait 14 gros pixels de large.
-pub const PUPIL_RADIUS_PIXELS: isize = 7;
-
-/// Le rayon de l'aura grise/transparente, compté en "gros pixels".
-/// Doit toujours être strictement supérieur à PUPIL_RADIUS_PIXELS.
-pub const AURA_RADIUS_PIXELS: isize = 12;
-
-/// Opacité de l'aura (de 0 = invisible, à 255 = totalement opaque).
-/// 15 donne cet effet de "lueur" très discrète dans le noir.
-pub const AURA_ALPHA_DECAY: u8 = 15;
-
-
-// ==========================================
-// PARAMÈTRES DE L'INTERFACE TEXTE (TERMINAL)
-// ==========================================
-
-/// Couleur du texte quand le Système (l'IA) parle.
-/// Actuellement : Gris clair.
-pub const TEXT_SYSTEM_COLOR: Color32 = Color32::from_rgb(180, 180, 180);
-
-/// Couleur du texte quand l'Utilisateur (toi) parle, ou pour la saisie.
-/// Actuellement : Rouge terminal.
-pub const TEXT_USER_COLOR: Color32 = Color32::from_rgb(220, 50, 50);
-
-/// Couleur de la fine ligne autour de la zone où tu écris ton texte.
-/// Actuellement : Gris très sombre, pour rester discret.
-pub const BORDER_COLOR: Color32 = Color32::from_rgb(30, 30, 30);
+// --- EFFETS VISUELS & COULEURS ---
+pub const GLOW_ALPHA: u8 = 15;                    // Transparence de l'aura (0 invisible, 255 opaque)
+pub const LASER_ALPHA: u8 = 0;                  // Transparence du trait vert (0 à 255)
+pub const LASER_COLOR: Color32 = Color32::from_rgb(0, 255, 0); // Couleur du trait de visée (Vert)
+pub const TEXT_SYSTEM_COLOR: Color32 = Color32::from_rgb(180, 180, 180); // Couleur réponse IA (Gris)
+pub const TEXT_USER_COLOR: Color32 = Color32::from_rgb(0, 255, 0);     // Couleur ton texte (Rouge)
+pub const BORDER_COLOR: Color32 = Color32::from_rgb(30, 30, 30);         // Couleur cadre de saisie

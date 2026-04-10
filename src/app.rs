@@ -1,110 +1,259 @@
-use eframe::egui::{self, Pos2, Rect, Vec2};
-use serde::{Deserialize, Serialize};
-use rand::Rng; // Import pour l'aléatoire
+use eframe::egui::{self, Key, Pos2, Rect, Vec2, Color32};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use crate::core::config::*;
-use crate::core::types::{Message, Role};
+use crate::core::llm_config::LlmProvider;
+use crate::api::client::ApiClient;
 use crate::ui::eyes::draw_eyes;
-use crate::ui::login::show_login_screen;
-use crate::ui::terminal::show_terminal_screen;
 
-#[derive(Deserialize, Serialize)]
-#[serde(default)]
-pub struct ShadyApp {
-    api_key: String,
-    is_unlocked: bool,
-    history: Vec<Message>,
-    #[serde(skip)]
-    user_input: String,
-    #[serde(skip)]
-    current_eye_offset: Vec2,
-    #[serde(skip)]
-    blink_timer: f32,       // Temps écoulé depuis le dernier clignement
-    #[serde(skip)]
-    next_blink: f32,        // Quand le prochain clignement doit arriver
-    #[serde(skip)]
-    eye_y_scale: f32,       // Facteur d'écrasement vertical actuel
+#[derive(PartialEq)]
+enum SetupStep {
+    InputKey,
+    SelectModel,
 }
 
-impl Default for ShadyApp {
-    fn default() -> Self {
-        let mut rng = rand::thread_rng();
-        Self {
-            api_key: String::new(),
-            is_unlocked: false,
-            history: vec![Message { role: Role::System, content: STR_WELCOME.to_string() }],
-            user_input: String::new(),
-            current_eye_offset: Vec2::ZERO,
-            blink_timer: 0.0,
-            next_blink: rng.gen_range((BLINK_INTERVAL_MEAN - BLINK_INTERVAL_VAR)..(BLINK_INTERVAL_MEAN + BLINK_INTERVAL_VAR)),
-            eye_y_scale: 1.0,
-        }
-    }
+pub struct ShadyApp {
+    // Config
+    api_key: String,
+    provider: LlmProvider,
+    model: String,
+    available_models: Vec<String>,
+    is_setup: bool,
+    setup_step: SetupStep,
+    
+    // Chat
+    history: Vec<(String, String)>,
+    user_input: String,
+    
+    // Visuel
+    current_eye_offset: Vec2,
+    eye_y_scale: f32,
+    blink_timer: f32,
+    next_blink: f32,
+
+    // Async communication
+    tx: Sender<ApiPayload>,
+    rx: Receiver<ApiResponse>,
+    is_waiting: bool,
+    status_message: String,
+}
+
+enum ApiPayload {
+    FetchModels(String, LlmProvider),
+    Chat(String, LlmProvider, String, Vec<(String, String)>),
+}
+
+enum ApiResponse {
+    ModelsFetched(Vec<String>),
+    ChatResponse(String),
+    Error(String),
 }
 
 impl ShadyApp {
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        if let Some(storage) = cc.storage {
-            return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
+    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+        let (tx_api, rx_main) = channel::<ApiResponse>();
+        let (tx_main, rx_api) = channel::<ApiPayload>();
+        
+        // Thread de travail pour les appels API
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            let client = ApiClient::new();
+            while let Ok(payload) = rx_api.recv() {
+                match payload {
+                    ApiPayload::FetchModels(key, prov) => {
+                        match rt.block_on(client.fetch_models(&key, prov)) {
+                            Ok(m) => { let _ = tx_api.send(ApiResponse::ModelsFetched(m)); },
+                            Err(e) => { let _ = tx_api.send(ApiResponse::Error(e)); }
+                        }
+                    }
+                    ApiPayload::Chat(key, prov, model, hist) => {
+                        match rt.block_on(client.send_chat(&key, prov, &model, hist)) {
+                            Ok(text) => { let _ = tx_api.send(ApiResponse::ChatResponse(text)); },
+                            Err(e) => { let _ = tx_api.send(ApiResponse::Error(e)); }
+                        }
+                    }
+                }
+            }
+        });
+
+        let _ = dotenvy::dotenv();
+        let api_key = std::env::var("API_KEY").unwrap_or_default();
+        let model = std::env::var("MODEL").unwrap_or_default();
+        let is_setup = api_key.is_empty();
+
+        Self {
+            api_key,
+            provider: LlmProvider::Unknown,
+            model,
+            available_models: Vec::new(),
+            is_setup,
+            setup_step: SetupStep::InputKey,
+            history: Vec::new(),
+            user_input: String::new(),
+            current_eye_offset: Vec2::ZERO,
+            eye_y_scale: 1.0,
+            blink_timer: 0.0,
+            next_blink: 4.0,
+            tx: tx_main,
+            rx: rx_main,
+            is_waiting: false,
+            status_message: "SYSTEM READY".to_string(),
         }
-        Self::default()
     }
 
-    fn update_blink(&mut self, dt: f32) {
-        self.blink_timer += dt;
-
-        if self.blink_timer > self.next_blink {
-            // Animation de clignement (Sinusoidal pour un aller-retour fluide)
-            let blink_progress = (self.blink_timer - self.next_blink) * BLINK_SPEED;
-            if blink_progress > std::f32::consts::PI {
-                // Fin du clignement
-                self.eye_y_scale = 1.0;
-                self.blink_timer = 0.0;
-                let mut rng = rand::thread_rng();
-                self.next_blink = rng.gen_range((BLINK_INTERVAL_MEAN - BLINK_INTERVAL_VAR)..(BLINK_INTERVAL_MEAN + BLINK_INTERVAL_VAR));
-            } else {
-                // On écrase l'œil selon la courbe du sinus
-                let wave = blink_progress.sin(); 
-                self.eye_y_scale = 1.0 - (wave * (1.0 - BLINK_MIN_Y_SCALE));
-            }
-        }
+    fn save_env(&self) {
+        let content = format!("API_KEY={}\nMODEL={}\n", self.api_key, self.model);
+        std::fs::write(".env", content).expect("Impossible d'écrire .env");
     }
 }
 
 impl eframe::App for ShadyApp {
-    fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        eframe::set_value(storage, eframe::APP_KEY, self);
-    }
-
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let dt = 1.0 / TARGET_FPS as f32;
-        self.update_blink(dt);
-        
-        ctx.request_repaint_after(std::time::Duration::from_millis(1000 / TARGET_FPS));
+        // --- GESTION DU TEMPS (BLINK) ---
+        let dt = 0.016; 
+        self.blink_timer += dt;
+        if self.blink_timer > self.next_blink {
+            let blink_progress = (self.blink_timer - self.next_blink) * 15.0;
+            if blink_progress > std::f32::consts::PI {
+                self.eye_y_scale = 1.0;
+                self.blink_timer = 0.0;
+                self.next_blink = rand::Rng::gen_range(&mut rand::thread_rng(), 2.0..6.0);
+            } else {
+                self.eye_y_scale = 1.0 - (blink_progress.sin() * 0.95);
+            }
+        }
 
-        egui::CentralPanel::default()
-            .frame(egui::Frame::none().fill(BG_COLOR))
-            .show(ctx, |ui| {
-                let available_rect = ui.available_rect_before_wrap();
-                let center_x = available_rect.center().x;
-                let center_y = available_rect.center().y - 120.0;
+        // --- RÉCEPTION DES RÉPONSES API ---
+        if let Ok(res) = self.rx.try_recv() {
+            self.is_waiting = false;
+            match res {
+                ApiResponse::ModelsFetched(m) => {
+                    self.available_models = m;
+                    self.setup_step = SetupStep::SelectModel;
+                    self.status_message = "SELECT MODEL [1, 2, 3...]".to_string();
+                }
+                ApiResponse::ChatResponse(t) => {
+                    self.history.push(("Sum Sum".to_string(), t));
+                    self.status_message = "ONLINE".to_string();
+                }
+                ApiResponse::Error(e) => {
+                    self.status_message = format!("ERROR: {}", e);
+                }
+            }
+        }
 
-                // On envoie le eye_y_scale au dessinateur
-                self.current_eye_offset = draw_eyes(ctx, center_x, center_y, self.current_eye_offset, self.eye_y_scale);
+        // --- DESSIN DE L'INTERFACE ---
+        egui::CentralPanel::default().frame(egui::Frame::none().fill(BG_COLOR)).show(ctx, |ui| {
+            let rect = ui.available_rect_before_wrap();
+            
+            // 1. DESSIN DES YEUX (SUM SUM)
+            self.current_eye_offset = draw_eyes(ctx, rect.center().x, rect.center().y - 20.0, self.current_eye_offset, self.eye_y_scale);
 
-                let terminal_rect = Rect::from_min_size(
-                    Pos2::new(40.0, center_y + 120.0),
-                    Vec2::new(available_rect.width() - 80.0, available_rect.height() - (center_y + 120.0) - 20.0),
-                );
+            // 2. ZONE DE TEXTE (TERMINAL)
+            // On définit une zone qui défile pour voir la liste des modèles
+            let terminal_area = Rect::from_min_max(
+                Pos2::new(15.0, 15.0), 
+                Pos2::new(rect.max.x - 15.0, rect.max.y - 70.0)
+            );
 
-                ui.allocate_ui_at_rect(terminal_rect, |ui| {
-                    ui.vertical(|ui| {
-                        if !self.is_unlocked {
-                            show_login_screen(ui, &mut self.api_key, &mut self.is_unlocked);
-                        } else {
-                            show_terminal_screen(ui, &mut self.history, &mut self.user_input);
-                        }
-                    });
+            ui.allocate_ui_at_rect(terminal_area, |ui| {
+                ui.vertical(|ui| {
+                    // Message de statut en haut
+                    ui.colored_label(Color32::from_rgb(0, 255, 0), &self.status_message);
+                    ui.add_space(10.0);
+
+                    if self.is_setup && self.setup_step == SetupStep::SelectModel {
+                        // AFFICHAGE DE LA LISTE DES MODÈLES
+                        egui::ScrollArea::vertical().show(ui, |ui| {
+                            for (i, m) in self.available_models.iter().enumerate() {
+                                ui.label(format!("[{}] {}", i + 1, m));
+                            }
+                        });
+                    } else {
+                        // AFFICHAGE DU CHAT CLASSIQUE
+                        egui::ScrollArea::vertical().stick_to_bottom(true).show(ui, |ui| {
+                            for (role, msg) in &self.history {
+                                ui.label(format!("{}: {}", role, msg));
+                                ui.add_space(4.0);
+                            }
+                            if self.is_waiting {
+                                ui.label("Sum Sum is thinking...");
+                            }
+                        });
+                    }
                 });
             });
+
+            // 3. BARRE DE SAISIE (BAS)
+            let input_area = Rect::from_min_max(
+                Pos2::new(10.0, rect.max.y - 60.0), 
+                Pos2::new(rect.max.x - 10.0, rect.max.y - 10.0)
+            );
+
+            ui.allocate_ui_at_rect(input_area, |ui| {
+                ui.separator();
+                ui.horizontal(|ui| {
+                    // Le prompt s'adapte à l'étape actuelle
+                    let prompt = if self.is_setup {
+                        if self.setup_step == SetupStep::InputKey { "SET API KEY > " } else { "SELECT # > " }
+                    } else {
+                        "CHAT > "
+                    };
+                    
+                    ui.label(prompt);
+
+                    let edit = ui.add(egui::TextEdit::singleline(&mut self.user_input)
+                        .desired_width(f32::INFINITY)
+                        .lock_focus(true)
+                        .font(egui::FontId::monospace(14.0)));
+                    
+                    if edit.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
+                        let input = self.user_input.trim().to_string();
+                        if !input.is_empty() {
+                            if self.is_setup {
+                                match self.setup_step {
+                                    SetupStep::InputKey => {
+                                        self.api_key = input;
+                                        self.provider = LlmProvider::detect(&self.api_key);
+                                        self.status_message = "FETCHING MODELS...".to_string();
+                                        let _ = self.tx.send(ApiPayload::FetchModels(self.api_key.clone(), self.provider.clone()));
+                                        self.is_waiting = true;
+                                    }
+                                    SetupStep::SelectModel => {
+                                        if let Ok(idx) = input.parse::<usize>() {
+                                            if idx > 0 && idx <= self.available_models.len() {
+                                                self.model = self.available_models[idx-1].clone();
+                                                self.save_env();
+                                                self.is_setup = false;
+                                                self.status_message = "SYSTEM ONLINE".to_string();
+                                                // Envoi du premier message auto
+                                                let _ = self.tx.send(ApiPayload::Chat(
+                                                    self.api_key.clone(), 
+                                                    self.provider.clone(), 
+                                                    self.model.clone(), 
+                                                    vec![("user".into(), "Bonjour".into())]
+                                                ));
+                                                self.is_waiting = true;
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                self.history.push(("User".to_string(), input.clone()));
+                                let _ = self.tx.send(ApiPayload::Chat(
+                                    self.api_key.clone(), 
+                                    self.provider.clone(), 
+                                    self.model.clone(), 
+                                    self.history.clone()
+                                ));
+                                self.is_waiting = true;
+                            }
+                            self.user_input.clear();
+                        }
+                        edit.request_focus();
+                    }
+                });
+            });
+        });
+        ctx.request_repaint();
     }
 }

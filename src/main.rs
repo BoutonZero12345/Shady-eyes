@@ -1,11 +1,13 @@
 mod app;
 pub mod core;
 pub mod ui;
+pub mod api;
 
 use eframe::egui;
 use crate::core::config::{WINDOW_HEIGHT, WINDOW_WIDTH, WINDOW_TITLE};
 
-fn main() -> eframe::Result<()> {
+#[tokio::main]
+async fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([WINDOW_WIDTH, WINDOW_HEIGHT]),

@@ -10,7 +10,7 @@
 
 VERSION : 1.0.0
 
-![Shady_eyes](the shady eyes.png)
+![Shady Eyes](./the%20shady%20eyes.png)
 
 Un esprit pixelisé vivant dans un terminal. Shady Eyes est une application de bureau développée en Rust (via eframe/egui), intégrant un compagnon IA nommé Sum Sum (ou Summer). Elle propose une interface rétro-terminal minimaliste et un système de rendu d'yeux interactifs.
 

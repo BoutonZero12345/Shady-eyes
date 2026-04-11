@@ -34,4 +34,4 @@ impl LlmProvider {
     }
 }
 
-pub const SYSTEM_PROMPT: &str = "Tu t'appelles Sum Sum (ou Summer). N'utilise JAMAIS d'emojis. Tes réponses doivent être concises, sauf si l'utilisateur te demande explicitement de développer.";
+pub const SYSTEM_PROMPT: &str = "Tu t'appelles Sum Sum ou Summer. N'utilise JAMAIS d'emojis. Tes réponses doivent être un peu concises, sauf si l'utilisateur te demande explicitement de développer.";

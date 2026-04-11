@@ -149,7 +149,6 @@ impl eframe::App for ShadyApp {
             self.current_eye_offset = draw_eyes(ctx, rect.center().x, rect.center().y - 20.0, self.current_eye_offset, self.eye_y_scale);
 
             // 2. ZONE DE TEXTE (TERMINAL)
-            // On définit une zone qui défile pour voir la liste des modèles
             let terminal_area = Rect::from_min_max(
                 Pos2::new(15.0, 15.0), 
                 Pos2::new(rect.max.x - 15.0, rect.max.y - 70.0)
@@ -157,9 +156,11 @@ impl eframe::App for ShadyApp {
 
             ui.allocate_ui_at_rect(terminal_area, |ui| {
                 ui.vertical(|ui| {
-                    // Message de statut en haut
-                    ui.colored_label(Color32::from_rgb(0, 255, 0), &self.status_message);
-                    ui.add_space(10.0);
+                    // On masque le statut s'il s'agit juste de "ONLINE" ou "SYSTEM ONLINE"
+                    if !self.status_message.contains("ONLINE") {
+                        ui.colored_label(Color32::from_rgb(0, 255, 0), &self.status_message);
+                        ui.add_space(10.0);
+                    }
 
                     if self.is_setup && self.setup_step == SetupStep::SelectModel {
                         // AFFICHAGE DE LA LISTE DES MODÈLES
@@ -172,27 +173,36 @@ impl eframe::App for ShadyApp {
                         // AFFICHAGE DU CHAT CLASSIQUE
                         egui::ScrollArea::vertical().stick_to_bottom(true).show(ui, |ui| {
                             for (role, msg) in &self.history {
-                                ui.label(format!("{}: {}", role, msg));
+                                let color = if role == "User" || role == "user" {
+                                    TEXT_USER_COLOR
+                                } else {
+                                    TEXT_SYSTEM_COLOR
+                                };
+                                // On a enlevé le nom, on met juste ">"
+                                ui.colored_label(color, format!("> {}", msg));
                                 ui.add_space(4.0);
                             }
                             if self.is_waiting {
-                                ui.label("Sum Sum is thinking...");
+                                ui.label("> ...");
                             }
                         });
                     }
                 });
             });
 
+            
+
+
+
+
             // 3. BARRE DE SAISIE (BAS)
             let input_area = Rect::from_min_max(
-                Pos2::new(10.0, rect.max.y - 60.0), 
+                Pos2::new(10.0, rect.max.y - 80.0), 
                 Pos2::new(rect.max.x - 10.0, rect.max.y - 10.0)
             );
 
             ui.allocate_ui_at_rect(input_area, |ui| {
-                ui.separator();
-                ui.horizontal(|ui| {
-                    // Le prompt s'adapte à l'étape actuelle
+                ui.horizontal_top(|ui| {
                     let prompt = if self.is_setup {
                         if self.setup_step == SetupStep::InputKey { "SET API KEY > " } else { "SELECT # > " }
                     } else {
@@ -201,59 +211,92 @@ impl eframe::App for ShadyApp {
                     
                     ui.label(prompt);
 
-                    let edit = ui.add(egui::TextEdit::singleline(&mut self.user_input)
-                        .desired_width(f32::INFINITY)
-                        .lock_focus(true)
-                        .font(egui::FontId::monospace(14.0)));
-                    
-                    if edit.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
-                        let input = self.user_input.trim().to_string();
-                        if !input.is_empty() {
-                            if self.is_setup {
-                                match self.setup_step {
-                                    SetupStep::InputKey => {
-                                        self.api_key = input;
-                                        self.provider = LlmProvider::detect(&self.api_key);
-                                        self.status_message = "FETCHING MODELS...".to_string();
-                                        let _ = self.tx.send(ApiPayload::FetchModels(self.api_key.clone(), self.provider.clone()));
-                                        self.is_waiting = true;
-                                    }
-                                    SetupStep::SelectModel => {
-                                        if let Ok(idx) = input.parse::<usize>() {
-                                            if idx > 0 && idx <= self.available_models.len() {
-                                                self.model = self.available_models[idx-1].clone();
-                                                self.save_env();
-                                                self.is_setup = false;
-                                                self.status_message = "SYSTEM ONLINE".to_string();
-                                                // Envoi du premier message auto
-                                                let _ = self.tx.send(ApiPayload::Chat(
-                                                    self.api_key.clone(), 
-                                                    self.provider.clone(), 
-                                                    self.model.clone(), 
-                                                    vec![("user".into(), "Bonjour".into())]
-                                                ));
-                                                self.is_waiting = true;
-                                            }
-                                        }
-                                    }
+                    // --- EXPLICATION DE LA MODIFICATION ---
+                    // On crée la fameuse "cage" (ScrollArea). On lui donne un ID unique 
+                    // pour qu'elle ne confonde pas son scroll avec celui du terminal au-dessus.
+                    // On lui impose une hauteur MAxIMALE stricte de 55 pixels (~ 3 lignes).
+                    egui::ScrollArea::vertical()
+                        .id_source("input_scroll_box")
+                        .max_height(55.0) 
+                        .show(ui, |ui| {
+                            
+                            // Le TextEdit est maintenant prisonnier de la cage.
+                            // S'il dépasse 55 pixels, la cage bloque sa croissance et active le scroll.
+                            let output = egui::TextEdit::multiline(&mut self.user_input)
+                                .desired_width(ui.available_width()) 
+                                .desired_rows(3) 
+                                .lock_focus(true)
+                                .font(egui::FontId::monospace(14.0))
+                                .show(ui);
+                            
+                            let edit = output.response;
+
+                            // --- LOGIQUE DU LASER VERT ---
+                            if edit.has_focus() {
+                                if let Some(cursor_range) = output.cursor_range {
+                                    let cursor_rect = output.galley.pos_from_cursor(&cursor_range.primary);
+                                    let screen_pos = edit.rect.min + cursor_rect.center().to_vec2();
+                                    ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new("cursor_pos"), screen_pos));
                                 }
                             } else {
-                                self.history.push(("User".to_string(), input.clone()));
-                                let _ = self.tx.send(ApiPayload::Chat(
-                                    self.api_key.clone(), 
-                                    self.provider.clone(), 
-                                    self.model.clone(), 
-                                    self.history.clone()
-                                ));
-                                self.is_waiting = true;
+                                ui.ctx().data_mut(|d| d.remove::<Pos2>(egui::Id::new("cursor_pos")));
                             }
-                            self.user_input.clear();
-                        }
-                        edit.request_focus();
-                    }
+                            
+                            // Validation avec la touche Entrée (sans Shift)
+                            if edit.has_focus() && ui.input(|i| i.key_pressed(Key::Enter) && !i.modifiers.shift) {
+                                let input = self.user_input.trim().to_string();
+                                if !input.is_empty() {
+                                    if self.is_setup {
+                                        match self.setup_step {
+                                            SetupStep::InputKey => {
+                                                self.api_key = input;
+                                                self.provider = LlmProvider::detect(&self.api_key);
+                                                self.status_message = "FETCHING MODELS...".to_string();
+                                                let _ = self.tx.send(ApiPayload::FetchModels(self.api_key.clone(), self.provider.clone()));
+                                                self.is_waiting = true;
+                                            }
+                                            SetupStep::SelectModel => {
+                                                if let Ok(idx) = input.parse::<usize>() {
+                                                    if idx > 0 && idx <= self.available_models.len() {
+                                                        self.model = self.available_models[idx-1].clone();
+                                                        self.save_env();
+                                                        self.is_setup = false;
+                                                        self.status_message = "SYSTEM ONLINE".to_string();
+                                                        let _ = self.tx.send(ApiPayload::Chat(
+                                                            self.api_key.clone(), 
+                                                            self.provider.clone(), 
+                                                            self.model.clone(), 
+                                                            vec![("user".into(), "Bonjour".into())]
+                                                        ));
+                                                        self.is_waiting = true;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        self.history.push(("User".to_string(), input.clone()));
+                                        let _ = self.tx.send(ApiPayload::Chat(
+                                            self.api_key.clone(), 
+                                            self.provider.clone(), 
+                                            self.model.clone(), 
+                                            self.history.clone()
+                                        ));
+                                        self.is_waiting = true;
+                                    }
+                                }
+                                self.user_input.clear();
+                                edit.request_focus();
+                            }
+                        }); // Fin de la cage ScrollArea
                 });
             });
-        });
+
+
+
+
+
+
+               });
         ctx.request_repaint();
     }
 }
